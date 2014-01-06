@@ -1,0 +1,35 @@
+GET /mtgox HTTP/1.1
+Upgrade: WebSocket
+Connection: Upgrade
+Host: ws://websocket.mtgox.com:80
+Origin: ws://websocket.mtgox.com:80
+
+
+
+GET /mtgox HTTP/1.1
+Upgrade: WebSocket
+Connection: Upgrade
+Host: socketio.mtgox.com
+Origin: ws://socketio.mtgox.com
+Sec_WebSocket_Key: +HCD64gytTSbCbBTdvduPw==
+Sec_WebSocket_Version: 13
+
+
+HTTP/1.1 101 Web Socket Protocol Handshake
+Upgrade: WebSocket
+Connection: Upgrade
+Origin: http://socketio.mtgox.com
+WebSocket-Origin: null
+WebSocket-Location: ws://socketio.mtgox.com/mtgox
+WebSocket-Protocol: *
+
+//MtGox Working Protocal Headers
+GET /mtgox HTTP/1.1
+Connection: Upgrade
+Host: websocket.mtgox.com
+Origin: ws://websocket.mtgox.com
+Sec-WebSocket-Key: 6omOcZl7/BelBTW0PIM8xQ==
+Sec-WebSocket-Protocol: mtgox
+Sec-WebSocket-Version: 13
+Upgrade: websocket
+

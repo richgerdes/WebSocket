@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.URI;
 import java.util.HashMap;
@@ -52,9 +53,11 @@ public class WebSocket {
 
 	/** The socket input stream. */
 	private InputStream mInput;
+	BufferedReader in;
 
 	/** The socket mOutput stream. */
 	private OutputStream mOutput;
+	PrintWriter out;
 
 	/** The external headers. */
 	private HashMap<String, String> mHeaders;
@@ -106,7 +109,7 @@ public class WebSocket {
 			path = path + "?" + query;
 		}
 
-		String origin = "http://" + host;
+		String origin =  mUrl.getScheme() + "://" + host;
 
 		mSocket = createSocket();
 		int port = mSocket.getPort();
@@ -122,31 +125,48 @@ public class WebSocket {
 			}
 		}
 
-		String request = "GET " + path + " HTTP/1.1\r\n" + "Upgrade: WebSocket\r\n" + "Connection: Upgrade\r\n" + "Host: " + host + "\r\n" + "Origin: " + origin + "\r\n" + extraHeaders.toString() + "\r\n";
+		String request = "GET " + path + " HTTP/1.1\r\n" +
+						"Upgrade: WebSocket\r\n" +
+						"Connection: Upgrade\r\n" +
+						"Host: " + host + "\r\n" +
+						"Origin: " + origin + "\r\n" +
+						extraHeaders.toString() + "\r\n";
+		
+		System.out.println(request);
+				
 		mOutput.write(request.getBytes());
 		mOutput.flush();
 
 		mInput = mSocket.getInputStream();
 		BufferedReader reader = new BufferedReader(new InputStreamReader(mInput));
 		String header = reader.readLine();
-		System.out.println("\"" + header + "\"");
-		if (!header.equals("HTTP/1.1 101 Web Socket Protocol Handshake")) {
+		
+		System.out.println("Server Replied");
+		System.out.println(header);
+
+		if (!header.equals("HTTP/1.1 101 Switching Protocols")) {
+			do {
+				System.out.println(header);
+				header = reader.readLine();
+			} while (!header.equals(""));
 			throw new IOException("Invalid handshake response");
 		}
-
-		header = reader.readLine();
-		if (!header.equals("Upgrade: WebSocket")) {
-			throw new IOException("Invalid handshake response");
-		}
-
-		header = reader.readLine();
-		if (!header.equals("Connection: Upgrade")) {
-			throw new IOException("Invalid handshake response");
-		}
-
-		do {
+		HashMap<String, String> ret = new HashMap<String, String>();
+		 while (!header.equals("")) {
 			header = reader.readLine();
-		} while (!header.equals(""));
+			System.out.println(header);
+			String[] a = header.split(": ");
+			if(a.length > 1)
+				ret.put(a[0], a[1]);
+		}
+
+		if (!(ret.get("Upgrade").equalsIgnoreCase("websocket"))) {
+			throw new IOException("Invalid handshake response");
+		}
+
+		if (!(ret.get("Connection").equalsIgnoreCase("upgrade"))) {
+			throw new IOException("Invalid handshake response");
+		}
 
 		mHandshakeComplete = true;
 	}
@@ -185,11 +205,12 @@ public class WebSocket {
 		if (!mHandshakeComplete) {
 			throw new IllegalStateException("Handshake not complete");
 		}
-
-		mOutput.write(0x00);
-		mOutput.write(str.getBytes("UTF-8"));
-		mOutput.write(0xff);
-		mOutput.flush();
+		
+		System.out.println("sending>> " + str);
+		if(out==null)
+			out = new PrintWriter(mOutput);
+		
+		out.write(str);
 	}
 
 	/**
@@ -202,33 +223,12 @@ public class WebSocket {
 		if (!mHandshakeComplete) {
 			throw new IllegalStateException("Handshake not complete");
 		}
-
-		StringBuffer buf = new StringBuffer();
-
-		int b = mInput.read();
-		if ((b & 0x80) == 0x80) {
-			// Skip data frame
-			int len = 0;
-			do {
-				b = mInput.read() & 0x7f;
-				len = len * 128 + b;
-			} while ((b & 0x80) != 0x80);
-
-			for (int i = 0; i < len; i++) {
-				mInput.read();
-			}
-		}
-
-		while (true) {
-			b = mInput.read();
-			if (b == 0xff) {
-				break;
-			}
-
-			buf.append((char) b);
-		}
-
-		return new String(buf.toString().getBytes(), "UTF8");
+		if(in==null)
+			in = new BufferedReader(new InputStreamReader(mInput, "UTF8"));
+		
+		String rcv = in.readLine();
+		System.out.println("recieved>> " + rcv);
+		return rcv;
 	}
 
 	/**
@@ -242,32 +242,4 @@ public class WebSocket {
 		mSocket.close();
 	}
 
-	/**
-	 * Quick echo test code.
-	 * 
-	 * @param args
-	 */
-	public static void fuck(String[] args) {
-		try {
-			HashMap<String, String> headers = new HashMap<String, String>();
-			headers.put("key1", "value1");
-			headers.put("key2", "value2");
-
-			WebSocket ws = new WebSocket(new URI("ws://localhost:8080/echo"));
-			ws.setHeaders(headers);
-			ws.connect();
-
-			String request = "Hello";
-			ws.send(request);
-			String response = ws.recv();
-			System.out.println(request);
-			if (request.equals(response)) {
-				System.out.print("Success!");
-			} else {
-				System.out.print("Failed!");
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
 }
